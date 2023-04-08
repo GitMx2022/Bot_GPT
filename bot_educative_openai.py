@@ -9,7 +9,7 @@ from datetime import datetime
 import openai
 import json
 import shutil
-
+import MySQLdb
 # Set up the API keys and tokens
 openai.api_key = os.environ["OPENAI_API_KEY"]
 github_token = os.environ["GITHUB_TOKEN"]
@@ -142,3 +142,83 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def enviar_entrada_a_openai(usuario_input):
+    response = openai.Completion.create(
+        engine="davinci", prompt=usuario_input, max_tokens=100, n=1,stop=None,temperature=0.5,
+    )
+    return response.choices[0].text
+
+# Función para buscar información en la base de datos
+def buscar_en_db(usuario_input):
+    # Conectarse a la base de datos
+    db = MySQLdb.connect(host="localhost", user="root", passwd="password", db="nombre_de_la_base_de_datos")
+    cursor = db.cursor()
+
+    # Ejecutar la consulta SQL
+    cursor.execute("SELECT columna_a, columna_b FROM tabla WHERE columna_a LIKE %s", ['%' + usuario_input + '%'])
+    results = cursor.fetchall()
+
+    # Construir la respuesta del bot
+    response = ""
+    for row in results:
+        response += row[0] + ": " + row[1] + "\n"
+    response += "¿Hay algo más en lo que pueda ayudar?"
+
+    # Cerrar la conexión a la base de datos y devolver la respuesta del bot
+    cursor.close()
+    db.close()
+    return response
+
+# Función para personalizar la respuesta del bot utilizando técnicas de aprendizaje automático
+def personalizar_respuesta(usuario_input, historial):
+    # Procesar y analizar el historial de conversaciones con el usuario
+    modelo = sklearn.linear_model.LogisticRegression()
+    X = procesar_historial(historial)
+    y = procesar_respuestas(historial)
+    modelo.fit(X, y)
+
+    # Utilizar el modelo de aprendizaje automático para personalizar la respuesta
+    X_nuevo = procesar_input(usuario_input)
+    respuesta_personalizada = modelo.predict(X_nuevo)
+
+    # Devolver la respuesta personalizada
+    return respuesta_personalizada
+
+# Función para recibir la entrada de voz del usuario
+def recibir_entrada_voz():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Háblame...")
+        audio = r.listen(source)
+    try:
+        entrada_voz = r.recognize_google(audio, language="es-MX")
+        print("Usuario:", entrada_voz)
+        return entrada_voz
+    except:
+        print("Lo siento, no pude entenderte...")
+        return ""
+
+# Función para enviar la respuesta del bot en forma de voz
+def hablar(respuesta):
+    motor_voz.say(respuesta)
+    motor_voz.runAndWait()
+
+# Función para manejar la conversación con el usuario
+def manejar_conversacion():
+    historial = []
+    print("Hola, ¿en qué puedo ayudarte hoy?")
+    while True:
+        # Leer la entrada del usuario
+        usuario_input = input("Usuario: ")
+        historial.append(usuario_input)
+
+        # Personalizar la respuesta del bot
+        respuesta_personalizada = personalizar_respuesta(usuario_input, historial)
+
+        # Enviar la entrada del usuario a OpenAI si no se encuentra una respuesta personalizada
+        if not respuesta_personalizada:
+            respuesta = enviar_entrada_a_openai(usuario_input)
+        else:
+            respuesta = respuesta_personalizada
+
