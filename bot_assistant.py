@@ -1,7 +1,7 @@
-mport openai
+import openai
 import os
 import espeakng
-import re
+impirt re
 import webbrowser
 import requests
 from github import Github
